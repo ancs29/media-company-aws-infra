@@ -1,7 +1,7 @@
 import aws_cdk as core
 import aws_cdk.assertions as assertions
 
-from media_company_aws_infra.media_company_aws_infra_stack import MediaCompanyAwsInfraStack
+from infra.stack import MediaCompanyAwsInfraStack
 
 # example tests. To run these tests, uncomment this file along with the example
 # resource in media_company_aws_infra/media_company_aws_infra_stack.py

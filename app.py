@@ -3,11 +3,11 @@ import os
 
 import aws_cdk as cdk
 
-from media_company_aws_infra.media_company_aws_infra_stack import MediaCompanyAwsInfraStack
+from infra.stack import Stack
 
 
 app = cdk.App()
-MediaCompanyAwsInfraStack(app, "MediaCompanyAwsInfraStack",
+Stack(app, "MediaCompanyAwsInfraStack",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.
