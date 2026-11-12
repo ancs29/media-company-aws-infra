@@ -1,5 +1,3 @@
-import os
-
 import aws_cdk as cdk
 
 from stacks.data_stack import DataStack
