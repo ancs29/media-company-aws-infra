@@ -6,7 +6,6 @@ from stacks.streaming_stack import StreamingStack
 
 from config import ENVS
 
-
 app = cdk.App()
 env_name = app.node.try_get_context("env") or "dev"
 config = ENVS[env_name]
