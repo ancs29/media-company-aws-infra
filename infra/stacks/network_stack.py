@@ -15,7 +15,8 @@ class NetworkStack(Stack):
             nat_gateways=1, # One NAT gateway to save money, trading off fault tolerance
             subnet_configuration=[
                 ec2.SubnetConfiguration(name="public", subnet_type=ec2.SubnetType.PUBLIC, cidr_mask=24),
-                ec2.SubnetConfiguration(name="private", subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS, cidr_mask=24),
+                ec2.SubnetConfiguration(name="private_egress", subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS, cidr_mask=24),
+                ec2.SubnetConfiguration(name="private_isolated", subnet_type=ec2.SubnetType.PRIVATE_ISOLATED, cidr_mask=24)
             ]
         )
 
