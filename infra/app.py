@@ -22,7 +22,7 @@ network_stack = NetworkStack(
 
 streaming_stack = StreamingStack(
     app, "StreamingStack",
-    landing=data_stack.landing_s3,
+    unsubscribe_events=data_stack.unsubscribe_events_s3,
     vpc=network_stack.vpc,
     env=cdk.Environment(account=config.account, region=config.region)
 )

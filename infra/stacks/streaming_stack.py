@@ -12,7 +12,7 @@ from constructs import Construct
 
 class StreamingStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, landing: s3.IBucket, vpc: ec2.Vpc, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, unsubscribe_events: s3.IBucket, vpc: ec2.Vpc, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         firehose_logs = logs.LogGroup(self, "UnsubscribeFirehoseLogs")
@@ -20,7 +20,7 @@ class StreamingStack(Stack):
 
         firehose.DeliveryStream(self, "UnsubscribeStream",
             destination=firehose.S3Bucket(
-                landing,
+                unsubscribe_events,
                 logging_config=firehose.EnableLogging(firehose_logs)
             )
         )
@@ -30,6 +30,7 @@ class StreamingStack(Stack):
             handler="unsubscribe_event.handler",
             code=_lambda.Code.from_asset("lambda"),
             vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
             log_group=lambda_logs
         )
 
@@ -37,9 +38,9 @@ class StreamingStack(Stack):
             event_pattern=events.EventPattern(
                 source=["aws.s3"],
                 detail_type=["Object Created"],
-                detail={"bucket": {"name": [landing.bucket_name]}},
+                detail={"bucket": {"name": [unsubscribe_events.bucket_name]}},
             ),
             targets=[targets.LambdaFunction(unsubscribe_lambda)] # pyright: ignore[reportArgumentType]
         )
 
-        landing.grant_read(unsubscribe_lambda)
+        unsubscribe_events.grant_read(unsubscribe_lambda)
