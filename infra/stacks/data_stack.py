@@ -13,8 +13,8 @@ class DataStack(Stack):
         self.bronze_s3 = s3.Bucket(self, "BronzeS3")
         self.silver_s3 = s3.Bucket(self, "SilverS3")
         self.gold_s3 = s3.Bucket(self, "GoldS3")
-        self.landing_s3 = s3.Bucket(self, "LandingS3", event_bridge_enabled=True)
-        self.unsubscribe_events_s3 = s3.Bucket(self, "UnsubscribeS3")
+        self.landing_s3 = s3.Bucket(self, "LandingS3")
+        self.unsubscribe_events_s3 = s3.Bucket(self, "UnsubscribeS3", event_bridge_enabled=True)
 
         self.bronze_database = glue.Database(
             self, "BronzeDatabase",
