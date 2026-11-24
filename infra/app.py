@@ -7,11 +7,11 @@ from stacks.streaming_stack import StreamingStack
 from config import ENVS
 
 app = cdk.App()
-env_name = app.node.try_get_context("env") or "dev"
-config = ENVS[env_name]
+config = ENVS[app.node.try_get_context("env") or "dev"]
 
 data_stack = DataStack(
     app, "DataStack",
+    config=config,
     env=cdk.Environment(account=config.account, region=config.region)
 )
 
