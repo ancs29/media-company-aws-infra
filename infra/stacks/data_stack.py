@@ -37,15 +37,15 @@ class DataStack(Stack):
         self.bronze_database = glue.Database(
             self, "BronzeDatabase",
             database_name=f"{glue_prefix}_bronze_{config.name}",
-            location_uri=self.bronze_s3.bucket_arn
+            location_uri=self.bronze_s3.s3_url_for_object()
         )
         self.silver_database = glue.Database(
             self, "SilverDatabase",
             database_name=f"{glue_prefix}_silver_{config.name}",
-            location_uri=self.silver_s3.bucket_arn
+            location_uri=self.silver_s3.s3_url_for_object()
         )
         self.gold_database = glue.Database(
             self, "GoldDatabase",
             database_name=f"{glue_prefix}_gold_{config.name}",
-            location_uri=self.gold_s3.bucket_arn
+            location_uri=self.gold_s3.s3_url_for_object()
         )
