@@ -13,6 +13,14 @@ AWS CDK (Python) app provisioning a media company's data platform: a medallion d
 - Design choices should still be sound and defensible, because the infrastructure is what's being shown.
 - Implement only the minimal viable solution for what was explicitly asked: no extras such as error handling. Suggest any further additions after implementing, and build nothing extra without the author's approval.
 
+## Original problem statement
+
+This is the brief the project started from. Some details have since changed, and it may be rewritten later. Treat it as a loose guideline for design decisions and don't enforce it rigidly: this is a portfolio project whose purpose is learning.
+
+> A media company operating in the US, EU and Asia Pacific needs an analytics platform for their mobile application. The platform must be able to process approximately 2 GB daily, including semi-structured and unstructured data, from snapshots of its Postgres database, APIs, and a landing S3 bucket containing raw business events. It will be consumed by BI teams across the three regions, who should only be able to see personally-identifying data from their region. Teams also want live alerts for users who unsubscribe, to follow up with them.
+>
+> The platform must be simple enough for three full time data engineers across the business to manage. The business wants to avoid vendor lock-in, minimise costs, and maximise security, and wants AWS as their cloud provider.
+
 ## Commands
 
 Setup (from repo root):
