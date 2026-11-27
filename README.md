@@ -1,10 +1,10 @@
 # Media Company AWS Infrastructure
 
-AWS CDK (Python) app that provisions the data platform for a media company: a medallion-style data lake (landing → bronze → silver → gold), the networking it runs in, and a streaming pipeline for subscriber "unsubscribe" events.
+AWS CDK (Python) app that provisions the data platform for a media company: a medallion-style data lake (landing → bronze → silver → gold), the networking it runs in, Glue processing jobs, a private Redshift Serverless warehouse, and a streaming pipeline for subscriber "unsubscribe" events.
 
 ## Architecture
 
-The app deploys three stacks, defined in [infra/stacks/](infra/stacks/) and wired together in [infra/app.py](infra/app.py).
+The app deploys five stacks, defined in [infra/stacks/](infra/stacks/) and wired together in [infra/app.py](infra/app.py).
 
 ### `DataStack` — [data_stack.py](infra/stacks/data_stack.py)
 
@@ -13,6 +13,7 @@ The app deploys three stacks, defined in [infra/stacks/](infra/stacks/) and wire
 | `LandingS3` bucket | Raw drop zone for incoming files (EventBridge notifications enabled) |
 | `BronzeS3` / `SilverS3` / `GoldS3` buckets | Medallion data lake layers |
 | `UnsubscribeS3` bucket | Destination for unsubscribe events delivered by Firehose |
+| `ScriptsS3` bucket | Glue job scripts, deployed from [infra/glue/](infra/glue/) (placeholders) |
 | Glue databases `bronze`, `silver`, `gold` | Data catalog databases, one per lake layer |
 
 ### `NetworkStack` — [network_stack.py](infra/stacks/network_stack.py)
@@ -23,6 +24,7 @@ The app deploys three stacks, defined in [infra/stacks/](infra/stacks/) and wire
   - `private_isolated` (no internet access)
 - A single NAT gateway, which saves cost but is not fault tolerant across AZs.
 - An S3 gateway endpoint, so isolated subnets can still reach S3.
+- A Glue interface endpoint (private DNS) in the isolated subnets, so Glue jobs there can reach the Glue API and Data Catalog.
 - VPC flow logs.
 
 ### `StreamingStack` — [streaming_stack.py](infra/stacks/streaming_stack.py)
@@ -37,14 +39,38 @@ Firehose (UnsubscribeStream) ──▶ UnsubscribeS3 ──(Object Created)─�
 - **EventBridge rule** matches S3 `Object Created` events on the unsubscribe bucket.
 - **Lambda** (`python3.14`, code in [infra/lambda/](infra/lambda/)) runs in the isolated subnets and has read access to the unsubscribe bucket. The handler in [unsubscribe_event.py](infra/lambda/unsubscribe_event.py) is currently a placeholder.
 
+### `ProcessingStack` — [processing_stack.py](infra/stacks/processing_stack.py)
+
+Depends on `DataStack` (lake and scripts buckets) and `NetworkStack` (the VPC).
+
+| Job | Glue connection | Flow |
+| --- | --- | --- |
+| `validate_api` | egress subnet (NAT) | external APIs → bronze |
+| `validate` | isolated subnet | landing → bronze |
+| `clean` | isolated subnet | bronze → silver |
+| `curate` | isolated subnet | silver → gold |
+
+- All four are PySpark ETL jobs (Glue 6.0) running placeholder scripts.
+- Two `NETWORK` Glue connections share one security group with the self-referencing all-TCP rule Spark needs.
+- A single shared job role (minimal, to be scoped down later).
+
+### `ConsumerStack` — [consumer_stack.py](infra/stacks/consumer_stack.py)
+
+Depends on `NetworkStack` (the VPC).
+
+- Redshift Serverless namespace and workgroup, private (`publicly_accessible=False`) in the isolated subnets, with enhanced VPC routing.
+- Admin password managed by Redshift in Secrets Manager.
+- Gold is queried in place with Redshift Spectrum through an associated IAM role (minimal, to be scoped down later).
+
 ## Project layout
 
 ```
 .
 ├── infra/
-│   ├── app.py              # CDK entry point: builds the three stacks
+│   ├── app.py              # CDK entry point: builds the five stacks
 │   ├── cdk.json            # CDK config (run cdk commands from this folder)
 │   ├── config.py           # Per-environment account/region settings
+│   ├── glue/               # Glue job scripts (placeholders)
 │   ├── lambda/             # Lambda function source code
 │   └── stacks/             # Stack definitions
 ├── tests/unit/             # Unit tests (pytest + CDK assertions)
@@ -92,7 +118,7 @@ cdk deploy --all -c env=dev  # deploy all stacks
 cdk destroy --all -c env=dev # tear down
 ```
 
-CDK deploys the stacks in dependency order: `DataStack` and `NetworkStack` first, then `StreamingStack`.
+CDK deploys the stacks in dependency order: `DataStack` and `NetworkStack` first, then `StreamingStack`, `ProcessingStack` and `ConsumerStack`.
 
 ## Tests
 

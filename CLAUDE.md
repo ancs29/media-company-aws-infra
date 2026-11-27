@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-AWS CDK (Python) app provisioning a media company's data platform: a medallion data lake (landing → bronze → silver → gold S3 buckets + Glue databases), a VPC, and a streaming pipeline for subscriber unsubscribe events. See [README.md](README.md) for the full resource inventory.
+AWS CDK (Python) app provisioning a media company's data platform: a medallion data lake (landing → bronze → silver → gold S3 buckets + Glue databases), a VPC, Glue processing jobs, a private Redshift Serverless warehouse, and a streaming pipeline for subscriber unsubscribe events. See [README.md](README.md) for the full resource inventory.
 
 **This is a portfolio project, not a production system.** The stacks will never be deployed to AWS. The goal is to implement an architecture the author designed and to demonstrate an understanding of AWS for a realistic scenario: a media company that needs a lakehouse for analytics. Keep this in mind when working here:
 
@@ -44,15 +44,18 @@ Tests (from repo root): `pytest`, single test: `pytest tests/unit/<file>.py::<te
 
 ## Architecture notes
 
-- **Entry point & wiring**: [infra/app.py](infra/app.py) builds three stacks — `DataStack`, `NetworkStack`, `StreamingStack`. `StreamingStack` receives the unsubscribe bucket from `DataStack` and the VPC from `NetworkStack` as constructor arguments; this creates the cross-stack dependencies (deploy order: Data + Network, then Streaming). Cross-stack sharing follows this pattern: expose resources as `self.<attr>` on the producing stack and pass them into the consumer's `__init__`.
+- **Entry point & wiring**: [infra/app.py](infra/app.py) builds five stacks — `DataStack`, `NetworkStack`, `StreamingStack`, `ProcessingStack` (Glue jobs), `ConsumerStack` (Redshift Serverless). The last three receive buckets from `DataStack` and/or the VPC from `NetworkStack` as constructor arguments; this creates the cross-stack dependencies (deploy order: Data + Network, then the rest). Cross-stack sharing follows this pattern: expose resources as `self.<attr>` on the producing stack and pass them into the consumer's `__init__`.
 - **Environments**: [infra/config.py](infra/config.py) maps `dev`/`uat`/`prod` to `EnvConfig(account, region)`; chosen via the `env` CDK context key, defaulting to `dev`. All three currently point at the same account/region.
 - **Imports are relative to `infra/`**, not the repo root (`from stacks.data_stack import ...`, `from config import ENVS`). Tests that import stacks need `infra/` on `sys.path` (or run with it as CWD).
-- **Lambda code path is CWD-relative**: `StreamingStack` uses `_lambda.Code.from_asset("lambda")`, which resolves to `infra/lambda/` only when synth runs from `infra/`. Handler modules live in [infra/lambda/](infra/lambda/) and are referenced as `<module>.handler`.
-- **Streaming flow**: Firehose `UnsubscribeStream` → `UnsubscribeS3` bucket → EventBridge rule (S3 `Object Created`, filtered by bucket name) → `UnsubscribeLambda`. The Lambda runs in `PRIVATE_ISOLATED` subnets with no internet; it reaches S3 only via the VPC's S3 gateway endpoint, so any other AWS service it needs will require an additional VPC interface endpoint.
-- EventBridge S3 events only fire for buckets with `event_bridge_enabled=True` (currently set on `LandingS3`).
+- **Asset paths are CWD-relative**: `StreamingStack` uses `_lambda.Code.from_asset("lambda")` and `DataStack` deploys `Source.asset("glue")` to the scripts bucket; these resolve to `infra/lambda/` and `infra/glue/` only when synth runs from `infra/`. Handler modules are referenced as `<module>.handler`; Glue jobs reference `<job>.py` in the scripts bucket.
+- **Streaming flow**: Firehose `UnsubscribeStream` → `UnsubscribeS3` bucket → EventBridge rule (S3 `Object Created`, filtered by bucket name) → `UnsubscribeLambda`. The Lambda runs in `PRIVATE_ISOLATED` subnets with no internet; it reaches S3 only via the VPC's S3 gateway endpoint, so any other AWS service it needs will require an additional VPC interface endpoint (a Glue endpoint already exists in `NetworkStack`).
+- **Glue networking**: jobs attach via `NETWORK` connections (`validate_api` in an egress subnet using the NAT; the rest in an isolated subnet using the S3 gateway and Glue interface endpoints). The shared Glue SG needs its self-referencing all-TCP rule.
+- **Redshift**: Serverless, private in the isolated subnets with enhanced VPC routing; gold is read via Spectrum (no COPY). IAM roles and SGs in `ProcessingStack`/`ConsumerStack` are deliberately minimal placeholders.
+- EventBridge S3 events only fire for buckets with `event_bridge_enabled=True` (currently set on `UnsubscribeS3`).
 - `cdk.json` sets `@aws-cdk/core:defaultCrossStackReferences` to `"weak"`.
 
 ## Current state
 
 - [tests/unit/test_media_company_aws_infra_stack.py](tests/unit/test_media_company_aws_infra_stack.py) is leftover CDK template boilerplate importing a non-existent `infra.stack` module, so `pytest` fails at collection. New tests should use `aws_cdk.assertions.Template.from_stack` against the real stacks.
-- The unsubscribe Lambda handler is a placeholder.
+- The unsubscribe Lambda handler and the Glue job scripts are placeholders.
+- Without AWS credentials, `cdk synth` reports an error for `NetworkStack`'s availability-zone lookup but still writes templates using dummy AZs.

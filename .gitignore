@@ -8,5 +8,3 @@ __pycache__
 .cdk.staging
 cdk.out
 cdk.context.json
-# Local helper commands
-commands.sh

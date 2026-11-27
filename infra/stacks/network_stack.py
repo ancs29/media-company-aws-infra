@@ -24,4 +24,13 @@ class NetworkStack(Stack):
             service=ec2.GatewayVpcEndpointAwsService.S3
         )
 
+        # Glue jobs in isolated subnets have no NAT, so they reach the Glue API
+        # (Data Catalog) through this endpoint. Only one private-DNS endpoint per
+        # service is allowed in a VPC, so it lives here as shared infrastructure.
+        self.vpc.add_interface_endpoint("GlueEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.GLUE,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            private_dns_enabled=True
+        )
+
         self.vpc.add_flow_log("FlowLog")
