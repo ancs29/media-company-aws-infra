@@ -49,7 +49,7 @@ class ProcessingStack(Stack):
         for lake_bucket in (landing, bronze, silver, gold):
             lake_bucket.grant_read_write(glue_role)
 
-        # `name` sets both the Glue job name and its script key (`<name>.py` in the scripts
+        # CONSTRAINT: `name` sets both the Glue job name and its script key (`<name>.py` in the scripts
         # bucket, deployed from infra/glue/). When adding a job, create infra/glue/<name>.py
         # with exactly the same name: synth won't catch a mismatch, the job only fails at run time.
         def job(construct_id: str, name: str, connection: glue.Connection) -> glue.PySparkEtlJob:
