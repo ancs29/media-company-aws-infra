@@ -25,7 +25,7 @@ network_stack = NetworkStack(
 
 streaming_stack = StreamingStack(
     app, "StreamingStack",
-    unsubscribe_events=data_stack.unsubscribe_events_s3,
+    config=config,
     vpc=network_stack.vpc,
     env=env
 )
@@ -46,6 +46,7 @@ consumer_stack = ConsumerStack(
     app, "ConsumerStack",
     config=config,
     vpc=network_stack.vpc,
+    gold=data_stack.gold_s3,
     env=env
 )
 

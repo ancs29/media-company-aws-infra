@@ -10,9 +10,8 @@ The app deploys five stacks, defined in [infra/stacks/](infra/stacks/) and wired
 
 | Resource | Purpose |
 | --- | --- |
-| `LandingS3` bucket | Raw drop zone for incoming files (EventBridge notifications enabled) |
+| `LandingS3` bucket | Raw drop zone for incoming files |
 | `BronzeS3` / `SilverS3` / `GoldS3` buckets | Medallion data lake layers |
-| `UnsubscribeS3` bucket | Destination for unsubscribe events delivered by Firehose |
 | `ScriptsS3` bucket | Glue job scripts, deployed from [infra/glue/](infra/glue/) (placeholders) |
 | Glue databases `bronze`, `silver`, `gold` | Data catalog databases, one per lake layer |
 
@@ -29,15 +28,17 @@ The app deploys five stacks, defined in [infra/stacks/](infra/stacks/) and wired
 
 ### `StreamingStack` — [streaming_stack.py](infra/stacks/streaming_stack.py)
 
-Depends on `DataStack` (the unsubscribe bucket) and `NetworkStack` (the VPC).
+Depends on `NetworkStack` (the VPC).
 
 ```
 Firehose (UnsubscribeStream) ──▶ UnsubscribeS3 ──(Object Created)──▶ EventBridge rule ──▶ UnsubscribeLambda
 ```
 
+- **`UnsubscribeS3` bucket** holds the unsubscribe events delivered by Firehose. It is the only bucket with EventBridge notifications enabled.
 - **Firehose delivery stream** writes unsubscribe events to `UnsubscribeS3`, logging to its own CloudWatch log group.
 - **EventBridge rule** matches S3 `Object Created` events on the unsubscribe bucket.
 - **Lambda** (`python3.14`, code in [infra/lambda/](infra/lambda/)) runs in the isolated subnets and has read access to the unsubscribe bucket. The handler in [unsubscribe_event.py](infra/lambda/unsubscribe_event.py) is currently a placeholder.
+- **IAM**: explicit roles for Firehose, the Lambda and CDK's bucket-notifications helper, passed with `without_policy_updates()`.
 
 ### `ProcessingStack` — [processing_stack.py](infra/stacks/processing_stack.py)
 
@@ -49,18 +50,19 @@ Depends on `DataStack` (lake and scripts buckets) and `NetworkStack` (the VPC).
 | `validate` | isolated subnet | landing → bronze |
 | `clean` | isolated subnet | bronze → silver |
 | `curate` | isolated subnet | silver → gold |
+| `aggregate` | isolated subnet | gold → gold |
 
-- All four are PySpark ETL jobs (Glue 6.0) running placeholder scripts.
+- All five are PySpark ETL jobs (Glue 6.0) running placeholder scripts.
 - Two `NETWORK` Glue connections share one security group with the self-referencing all-TCP rule Spark needs.
-- A single shared job role (minimal, to be scoped down later).
+- One explicit IAM role per job, passed with `without_policy_updates()`, with access only to the buckets and Glue databases its flow needs (Iceberg tables, no table creation or deletion).
 
 ### `ConsumerStack` — [consumer_stack.py](infra/stacks/consumer_stack.py)
 
-Depends on `NetworkStack` (the VPC).
+Depends on `DataStack` (gold bucket) and `NetworkStack` (the VPC).
 
 - Redshift Serverless namespace and workgroup, private (`publicly_accessible=False`) in the isolated subnets, with enhanced VPC routing.
 - Admin password managed by Redshift in Secrets Manager.
-- Gold is queried in place with Redshift Spectrum through an associated IAM role (minimal, to be scoped down later).
+- Gold is queried in place with Redshift Spectrum through an associated IAM role with read-only access to the gold bucket and gold Glue database.
 
 ## Project layout
 
